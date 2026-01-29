@@ -1,9 +1,9 @@
 blueprint:
   homeassistant:
     min_version: 2024.10.0
-  author: damru (Modified for speed)
+  author: damru (Modified for speed + 1% Lock)
   domain: automation
-  name: Ikea's Remotes 💡 Light control (My version)
+  name: Ikea's Remotes 💡 Light control (Fast + 1% Lock)
   description: >
     ## 💡 Control a light with **IKEA's remotes**
         
@@ -23,7 +23,7 @@ blueprint:
     (Optional: set the target brightness by enabling **Force Brightness** and setting a **Brightness** value)
       - Press **off** button to turn off the light
       - Hold **on** button to increase the brightness
-      - Hold **off** button to decrease the brightness down to 1%
+      - Hold **off** button to decrease the brightness down to 1% (Will not turn off)
   input:
     remote_devices:
       name: Remotes
@@ -224,141 +224,4 @@ triggers:
     enabled: "{{ mqtt_enabled }}"
   - trigger: event
     event_type: zha_event
-    event_data:
-      command: long_press
-      endpoint_id: 2
-    id: hold-off-zha-somrig
-    enabled: "{{ zha_enabled }}"
-  - trigger: mqtt
-    topic: "+/+/action"
-    payload: 2_long_press
-    id: hold-off-z2m-somrig
-    enabled: "{{ mqtt_enabled }}"
-  - trigger: event
-    event_type: zha_event
-    event_data:
-      command: long_release
-      endpoint_id: 1
-    id: release-hold-on-zha-somrig
-    enabled: "{{ zha_enabled }}"
-  - trigger: mqtt
-    topic: "+/+/action"
-    payload: 1_long_release
-    id: release-hold-on-z2m-somrig
-    enabled: "{{ mqtt_enabled }}"
-  - trigger: event
-    event_type: zha_event
-    event_data:
-      command: long_release
-      endpoint_id: 2
-    id: release-hold-off-zha-somrig
-    enabled: "{{ zha_enabled }}"
-  - trigger: mqtt
-    topic: "+/+/action"
-    payload: 2_long_release
-    id: release-hold-off-z2m-somrig
-    enabled: "{{ mqtt_enabled }}"
-variables:
-  helper_force_brightness: !input helper_force_brightness
-  # EDITED: Increased delay to 0.2s and step to 10% for better network stability and faster response
-  helper_hold_delay: 0.2
-  helper_hold_dim_step: 10
-  is_mqtt: "{{ trigger.platform == 'mqtt' }}"
-  is_zha: "{{ trigger.platform == 'event' and trigger.event.event_type == 'zha_event' }}"
-  light: !input light
-  mqtt_topic: "{{ trigger.topic }}"
-  remote_devices: !input remote_devices
-  remote_devices_names: "{{ remote_devices | map('device_attr', 'name') | list }}"
-condition:
-  - condition: template
-    value_template: >-
-      {{ 
-        (trigger.event.data.device_id in remote_devices if is_zha) or
-        (trigger.topic.split('/')[1] in remote_devices_names if is_mqtt) 
-      }}
-actions:
-  - choose:
-      - conditions:
-          - condition: trigger
-            id:
-              - press-on-zha
-              - press-on-z2m
-              - press-on-zha-somrig
-              - press-on-z2m-somrig
-        sequence:
-          - choose:
-              - conditions: "{{ helper_force_brightness }}"
-                sequence:
-                  - action: light.turn_on
-                    target:
-                      entity_id: !input light
-                    data:
-                      brightness_pct: !input helper_brightness
-            default:
-              - action: light.turn_on
-                target:
-                  entity_id: !input light
-                data: {}
-      - conditions:
-          - condition: trigger
-            id:
-              - press-off-zha
-              - press-off-z2m
-              - press-off-zha-somrig
-              - press-off-z2m-somrig
-        sequence:
-          - action: light.turn_off
-            target:
-              entity_id: !input light
-            data: {}
-      - conditions:
-          - condition: trigger
-            id:
-              - hold-on-zha
-              - hold-on-z2m
-              - hold-on-zha-somrig
-              - hold-on-z2m-somrig
-        sequence:
-          - repeat:
-              while:
-                - condition: trigger
-                  id:
-                    - hold-on-zha
-                    - hold-on-z2m
-                    - hold-on-zha-somrig
-                    - hold-on-z2m-somrig
-              sequence:
-                - parallel:
-                    - action: light.turn_on
-                      target:
-                        entity_id: !input light
-                      data:
-                        brightness_step_pct: "{{ helper_hold_dim_step }}"
-                        transition: "{{ helper_hold_delay }}"
-                    - delay: "{{ helper_hold_delay }}"
-      - conditions:
-          - condition: trigger
-            id:
-              - hold-off-zha
-              - hold-off-z2m
-              - hold-off-zha-somrig
-              - hold-off-z2m-somrig
-        sequence:
-          # EDITED: Replaced complex count loop with standard while loop for consistent stopping
-          - repeat:
-              while:
-                - condition: trigger
-                  id:
-                    - hold-off-zha
-                    - hold-off-z2m
-                    - hold-off-zha-somrig
-                    - hold-off-z2m-somrig
-              sequence:
-                - parallel:
-                    - action: light.turn_on
-                      target:
-                        entity_id: !input light
-                      data:
-                        brightness_step_pct: "{{ helper_hold_dim_step | int * -1 }}"
-                        transition: "{{ helper_hold_delay }}"
-                    - delay: "{{ helper_hold_delay }}"
+    event_data
